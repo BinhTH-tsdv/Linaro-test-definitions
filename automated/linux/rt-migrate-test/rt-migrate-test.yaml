@@ -1,0 +1,39 @@
+metadata:
+    name: rt-migrate-test
+    format: "Lava-Test Test Definition 1.0"
+    description: "rt-migrate-test verifies the RT threads scheduler balancing."
+    maintainer:
+        - chase.qi@linaro.org
+    os:
+        - debian
+        - ubuntu
+        - fedora
+        - centos
+        - openembedded
+    scope:
+        - performance
+        - preempt-rt
+    environment:
+        - lava-test-shell
+    devices:
+        - hi6220-hikey
+        - apq8016-sbc
+        - mustang
+        - moonshot
+        - thunderX
+        - d03
+        - d05
+
+params:
+    # Priority of lowest prio thread (3 threads are created).
+    PRIORITY: "96"
+    # Execute rt-migrate-test for given time
+    DURATION: "5m"
+    # Background workload to be run during the meassurement
+    BACKGROUND_CMD: ""
+
+run:
+    steps:
+        - cd ./automated/linux/rt-migrate-test/
+        - ./rt-migrate-test.sh -p "${PRIORITY}" -D "${DURATION}" -w "${BACKGROUND_CMD}"
+        - ../../utils/send-to-lava.sh ./output/result.txt

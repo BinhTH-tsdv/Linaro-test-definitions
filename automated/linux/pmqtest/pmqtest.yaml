@@ -1,0 +1,37 @@
+metadata:
+    name: pmqtest
+    format: "Lava-Test Test Definition 1.0"
+    description: "Pmqtest measures the latency of interprocess communication
+                  with POSIX messages queues. The test starts pairs of threads
+                  that are synchronized via mq_send/mw_receive() and measures
+                  the latency between sending and receiving the message."
+    maintainer:
+        - chase.qi@linaro.org
+    os:
+        - debian
+        - ubuntu
+        - centos
+        - fedora
+        - openembedded
+    scope:
+        - performance
+        - preempt-rt
+    devices:
+        - hi6220-hikey
+        - apq8016-sbc
+        - mustang
+        - moonshot
+        - thunderX
+        - d03
+        - d05
+
+params:
+    DURATION: "5m"
+    # Background workload to be run during the meassurement
+    BACKGROUND_CMD: ""
+
+run:
+    steps:
+        - cd ./automated/linux/pmqtest/
+        - ./pmqtest.sh -D "${DURATION}" -w "${BACKGROUND_CMD}"
+        - ../../utils/send-to-lava.sh ./output/result.txt

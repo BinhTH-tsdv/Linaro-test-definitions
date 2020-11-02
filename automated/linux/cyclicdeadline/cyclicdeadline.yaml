@@ -1,0 +1,46 @@
+metadata:
+    name: cyclicdeadline
+    format: "Lava-Test Test Definition 1.0"
+    description: "cyclicdeadline is a test that is similar to cyclictest
+                  but instead of using SCHED_FIFO and nanosleep() to
+                  measure jitter, it uses SCHED_DEADLINE and has the
+                  deadline be the wakeup interval."
+    maintainer:
+        - Daniel Wagner <wagi@monom.org>
+    os:
+        - debian
+        - ubuntu
+        - fedora
+        - centos
+        - openembedded
+    scope:
+        - performance
+        - preempt-rt
+    environment:
+        - lava-test-shell
+    devices:
+        - hi6220-hikey
+        - apq8016-sbc
+        - mustang
+        - moonshot
+        - thunderX
+        - d03
+        - d05
+
+params:
+    # Base interval of thread in us.
+    INTERVAL: "1000"
+    # Step size in us.
+    STEP: "500"
+    # Number of threads to test
+    THREADS: "1"
+    # Execute cyclicdeadline for given time
+    DURATION: "5m"
+    # Background workload to be run during the meassurement
+    BACKGROUND_CMD: ""
+
+run:
+    steps:
+        - cd ./automated/linux/cyclicdeadline/
+        - ./cyclicdeadline.sh -i "${INTERVAL}" -s "${STEP}" -t "${THREADS}" -D "${DURATION}" -w "${BACKGROUND_CMD}"
+        - ../../utils/send-to-lava.sh ./output/result.txt
