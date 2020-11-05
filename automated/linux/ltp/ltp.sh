@@ -58,7 +58,6 @@ while getopts "M:T:S:b:d:g:e:s:v:R:u:p:t:" arg; do
         LOG_FILE=$(echo "${OPTARG}"| sed 's,\/,_,')
         ;;
      S)
-        SKIPFILE="${OPTARG}"
         if [ -z "${OPTARG##*http*}" ]; then
           if [ -z "${OPTARG##*yaml*}" ]; then
             # Skipfile is of type yaml

@@ -21,7 +21,7 @@ metadata:
 params:
     # LTP version
     LTP_VERSION: 20180515
-    SKIP_INSTALL: false
+    SKIP_INSTALL: true
 
 run:
     steps:
