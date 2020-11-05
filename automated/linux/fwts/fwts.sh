@@ -1,7 +1,5 @@
 #!/bin/bash
 
-set -x
-
 # shellcheck disable=SC1091
 . ../../lib/sh-test-lib
 OUTPUT="$(pwd)/output"
@@ -14,16 +12,15 @@ TEST_SKIP_LOG="${OUTPUT}/test_skip_log.txt"
 export RESULT_FILE
 
 TESTS="oops --uefitests"
-TEST_PROGRAM=fwts
-TEST_PROG_VERSION=
-TEST_GIT_URL=https://github.com/ColinIanKing/fwts.git
-TEST_DIR="/bin"
+FWTS_VERSION=
+FWTS_URL=https://github.com/ColinIanKing/fwts.git
+FWTS_PATH="/bin"
 SKIP_INSTALL="false"
 
 usage() {
 	echo "\
 	Usage: [sudo] ./fwts.sh [-t <TESTS>]
-				     [-v <TEST_PROG_VERSION>] [-u <TEST_GIT_URL>] [-p <TEST_DIR>]
+				     [-v <FWTS_VERSION>] [-u <FWTS_URL>] [-p <FWTS_PATH>]
 				     [-s <true|false>]
 
 	<TESTS>:
@@ -35,26 +32,22 @@ usage() {
 	indistinguishable w.r.t. to actually starting these applications.
 	Default value: \"throughput replayed-startup\"
 
-	<TEST_PROG_VERSION>:
-	If this parameter is set, then the ${TEST_PROGRAM} suite is cloned. In
+	<FWTS_VERSION>:
+	If this parameter is set, then the FWTS suite is cloned. In
 	particular, the version of the suite is set to the commit
 	pointed to by the parameter. A simple choice for the value of
 	the parameter is, e.g., HEAD. If, instead, the parameter is
-	not set, then the suite present in TEST_DIR is used.
+	not set, then the suite present in FWTS_PATH is used.
 
-	<TEST_GIT_URL>:
-	If this parameter is set, then the ${TEST_PROGRAM} suite is cloned
-	from the URL in TEST_GIT_URL. Otherwise it is cloned from the
+	<FWTS_URL>:
+	If this parameter is set, then the FWTS suite is cloned
+	from the URL in FWTS_URL. Otherwise it is cloned from the
 	standard repository for the suite. Note that cloning is done
-	only if TEST_PROG_VERSION is not empty
+	only if FWTS_VERSION is not empty
 
-	<TEST_DIR>:
-	If this parameter is set, then the ${TEST_PROGRAM} suite is cloned to or
-	looked for in TEST_DIR. Otherwise it is cloned to $(pwd)/${TEST_PROGRAM}
-
-	<SKIP_INSTALL>:
-	If you already have it installed into the rootfs.
-	default: false"
+	<FWTS_PATH>:
+	If this parameter is set, then the FWTS suite is cloned to or
+	looked for in FWTS_PATH. Otherwise it is cloned to $(pwd)/fwts"
 }
 
 while getopts "h:t:p:u:v:s:" opt; do
@@ -63,16 +56,14 @@ while getopts "h:t:p:u:v:s:" opt; do
 			TESTS="$OPTARG"
 			;;
 		v)
-			TEST_PROG_VERSION="$OPTARG"
+			FWTS_VERSION="$OPTARG"
 			;;
 		u)
-			if [[ "$OPTARG" != '' ]]; then
-				TEST_GIT_URL="$OPTARG"
-			fi
+			FWTS_URL="$OPTARG"
 			;;
 		p)
 			if [[ "$OPTARG" != '' ]]; then
-				TEST_DIR="$OPTARG"
+				FWTS_PATH="$OPTARG"
 			fi
 			;;
 		s)
@@ -94,15 +85,13 @@ install() {
 	dist_name
 	case "${dist}" in
 		debian|ubuntu)
-			pkgs="git fio sysstat libaio-dev gawk coreutils bc psmisc g++ \
-				autoconf automake libglib2.0-dev libtool libpcre3-dev \
-				flex bison dkms libfdt-dev libbsd-dev"
+			pkgs="fio sysstat libaio-dev gawk coreutils bc \
+				  psmisc g++ git"
 			install_deps "${pkgs}" "${SKIP_INSTALL}"
 			;;
 		fedora|centos)
 			pkgs="fio sysstat libaio-devel gawk coreutils bc \
-				  psmisc gcc-c++ git-core autoconf automake glib-devel \
-				  libtool pcre-devel flex bison dkms libfdt-devel libbsd-devel"
+				  psmisc gcc-c++ git-core"
 			install_deps "${pkgs}" "${SKIP_INSTALL}"
 			;;
 		# When build do not have package manager
@@ -111,6 +100,35 @@ install() {
 			echo "Unsupported distro: ${dist}! Package installation skipped!"
 			;;
 	esac
+}
+
+get_tests() {
+	if [[ "$FWTS_VERSION" != "" && ( ! -d "$FWTS_PATH" || -d "$FWTS_PATH"/.git ) ]];
+	then
+		if [[ -d "$FWTS_PATH"/.git ]]; then
+			echo Using repository "$PATH"
+		else
+			git clone "$FWTS_URL" "$FWTS_PATH"
+		fi
+
+		cd "$FWTS_PATH" || exit 1
+		if [[ "$FWTS_VERSION" != "" ]]; then
+			if ! git reset --hard "$FWTS_VERSION"; then
+				echo Failed to set FWTS to commit "$FWTS_VERSION", sorry
+				exit 1
+			fi
+		else
+			echo Using "$PATH"
+		fi
+
+	else
+		if [[ ! -d "$FWTS_PATH" ]]; then
+			echo No FWTS suite in "$FWTS_PATH", sorry
+			exit 1
+		fi
+		echo Assuming FWTS is pre-installed in "$FWTS_PATH"
+		cd "$FWTS_PATH" || exit 1
+	fi
 }
 
 # Parse fwts test results
@@ -148,22 +166,9 @@ parse_fwts_test_results() {
 	rm -rf "${TMP_LOG}" "${RESULT_LOG}" "${TEST_PASS_LOG}" "${TEST_FAIL_LOG}" "${TEST_SKIP_LOG}"
 }
 
-build_install_tests() {
-	pushd "${TEST_DIR}" || exit 1
-	autoreconf -ivf
-	./configure --prefix=/
-	make -j"$(nproc)" all
-	make install
-	popd || exit 1
-}
-
 run_test() {
 
-	# Double quote to prevent globbing and word splitting.
-	# In this case we don't want to add extra quote since that can make the
-	# string get splitted.
-	# shellcheck disable=SC2086
-	fwts ${TESTS} - 2>&1 | tee -a "${RESULT_LOG}"
+	fwts "${TESTS}" - 2>&1 | tee -a "${RESULT_LOG}"
 	parse_fwts_test_results
 }
 
@@ -173,13 +178,9 @@ create_out_dir "${OUTPUT}"
 # Install and run test
 
 if [ "${SKIP_INSTALL}" = "true" ] || [ "${SKIP_INSTALL}" = "True" ]; then
-	info_msg "${TEST_PROGRAM} installation skipped altogether"
+	info_msg "fwts installation skipped altogether"
 else
 	install
 fi
-
-if ! (which fwts); then
-	get_test_program "${TEST_GIT_URL}" "${TEST_DIR}" "${TEST_PROG_VERSION}" "${TEST_PROGRAM}"
-	build_install_tests
-fi
+get_tests
 run_test "${TESTS}"

@@ -46,6 +46,7 @@ install_ltp_open_posix() {
     do
       make "${EACH_TEST}"-all || true
     done
+    make tools-all || true
 }
 
 # Parse LTP open posix output

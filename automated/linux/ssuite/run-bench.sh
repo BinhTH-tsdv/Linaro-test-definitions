@@ -7,11 +7,10 @@ RESULT_FILE="${OUTPUT}/result.txt"
 
 TESTS="throughput replayed-gnome-term-startup"
 TEST_DEV=sda
-TEST_PROGRAM="S"
 FORMAT=no
-TEST_PROG_VERSION=
-TEST_GIT_URL=https://github.com/Algodev-github/S
-TEST_DIR="$(pwd)/${TEST_PROGRAM}"
+S_VERSION=
+S_URL=https://github.com/Algodev-github/S
+S_PATH="$(pwd)/S"
 SKIP_INSTALL="false"
 ONLY_READS=""
 NUM_REPETITIONS=5
@@ -19,7 +18,7 @@ NUM_REPETITIONS=5
 usage() {
 	echo "\
 	Usage: [sudo] ./run-bench.sh [-t <TESTS>] [-d <TEST_DEV>] [-f <FORMAT>]
-				     [-v <TEST_PROG_VERSION>] [-u <TEST_GIT_URL>] [-p <TEST_DIR>]
+				     [-v <S_VERSION>] [-u <S_URL>] [-p <S_PATH>]
 				     [-r <ONLY_READS>] [-s <true|false>]
 				     [-n NUM_REPETITIONS]
 
@@ -52,22 +51,22 @@ usage() {
 	the drive, and that fs is used for the test.
 	Default value: no
 
-	<TEST_PROG_VERSION>:
-	If this parameter is set, then the ${TEST_PROGRAM} suite is cloned. In
+	<S_VERSION>:
+	If this parameter is set, then the S suite is cloned. In
 	particular, the version of the suite is set to the commit
 	pointed to by the parameter. A simple choice for the value of
 	the parameter is, e.g., HEAD. If, instead, the parameter is
-	not set, then the suite present in TEST_DIR is used.
+	not set, then the suite present in S_PATH is used.
 
-	<TEST_GIT_URL>:
-	If this parameter is set, then the ${TEST_PROGRAM} suite is cloned
-	from the URL in TEST_GIT_URL. Otherwise it is cloned from the
+	<S_URL>:
+	If this parameter is set, then the S suite is cloned
+	from the URL in S_URL. Otherwise it is cloned from the
 	standard repository for the suite. Note that cloning is done
-	only if TEST_PROG_VERSION is not empty
+	only if S_VERSION is not empty
 
-	<TEST_DIR>:
-	If this parameter is set, then the ${TEST_PROGRAM} suite is cloned to or
-	looked for in TEST_DIR. Otherwise it is cloned to $(pwd)/${TEST_PROGRAM}
+	<S_PATH>:
+	If this parameter is set, then the S suite is cloned to or
+	looked for in S_PATH. Otherwise it is cloned to $(pwd)/S
 
 	<ONLY_READS>:
 	If this parameter is set to yes then only workloads made of
@@ -75,11 +74,7 @@ usage() {
 	Default value: no
 
 	<NUM_REPETITIONS>:
-	Number of times each benchmark is repeated. Default: 5.
-
-	<SKIP_INSTALL>:
-	If you already have it installed into the rootfs.
-	default: false"
+	Number of times each benchmark is repeated. Default: 5."
 }
 
 while getopts "ht:d:f:p:u:v:s:r:n:" opt; do
@@ -94,16 +89,14 @@ while getopts "ht:d:f:p:u:v:s:r:n:" opt; do
 			FORMAT="$OPTARG"
 			;;
 		v)
-			TEST_PROG_VERSION="$OPTARG"
+			S_VERSION="$OPTARG"
 			;;
 		u)
-			if [[ "$OPTARG" != '' ]]; then
-				TEST_GIT_URL="$OPTARG"
-			fi
+			S_URL="$OPTARG"
 			;;
 		p)
 			if [[ "$OPTARG" != '' ]]; then
-				TEST_DIR="$OPTARG"
+				S_PATH="$OPTARG"
 			fi
 			;;
 		s)
@@ -148,6 +141,35 @@ install() {
 			echo "Unsupported distro: ${dist}! Package installation skipped!"
 			;;
 	esac
+}
+
+get_ssuite() {
+	if [[ "$S_VERSION" != "" && ( ! -d "$S_PATH" || -d "$S_PATH"/.git ) ]];
+	then
+		if [[ -d "$S_PATH"/.git ]]; then
+			echo Using repository "$PATH"
+		else
+			git clone "$S_URL" "$S_PATH"
+		fi
+
+		cd "$S_PATH" || exit 1
+		if [[ "$S_VERSION" != "" ]]; then
+			if ! git reset --hard "$S_VERSION"; then
+				echo Failed to set S to commit "$S_VERSION", sorry
+				exit 1
+			fi
+		else
+			echo Using "$PATH"
+		fi
+
+	else
+		if [[ ! -d "$S_PATH" ]]; then
+			echo No S suite in "$S_PATH", sorry
+			exit 1
+		fi
+		echo Assuming S is pre-installed in "$S_PATH"
+		cd "$S_PATH" || exit 1
+	fi
 }
 
 run_test() {
@@ -197,6 +219,6 @@ if [ "${SKIP_INSTALL}" = "true" ] || [ "${SKIP_INSTALL}" = "True" ]; then
 else
 	install
 fi
-get_test_program "${TEST_GIT_URL}" "${TEST_DIR}" "${TEST_PROG_VERSION}" "${TEST_PROGRAM}"
+get_ssuite
 create_out_dir "${OUTPUT}"
 run_test "$TESTS" "$TEST_DEV" "$FORMAT"
